@@ -15,7 +15,7 @@ import win32gui
 
 
 __author__ = 'Dmitriy Sidov'
-__version__ = '0.1.0'
+__version__ = '0.1.1'
 __maintainer__ = 'Dmitriy Sidov'
 __email__ = 'dmitriy.sidov@gmail.com'
 __status__ = 'Is it working?'
@@ -93,45 +93,51 @@ def copy_file(file_path, copy_path):
     else:
         return False
 
-input_help = input('ACDSee file sorter. Type -h to get help. ')
-if '-h' in input_help:
-    print(f'''
-    Usage:
-    Put .exe file into photos root folder and run program.
-    Start ACDSee, use wheel to change photos and press enter when you see matching photo.
+
+print('ACDSee images sorter')
+
+while True:
+    input_ext = input('Enter file extension (def is .NEF). Type -h to get help.')
+    if '-h' in input_ext:
+        print(f'''
+        Usage:
+        Put .exe file into photos root folder and run program.
+        Start ACDSee, use wheel to change photos and press enter when you see matching photo.
+        
+        File name extensions should be on!
+        (Windows Explorer -> View -> File name extension)
+        
+        Author/releases:
+        https://github.com/dsidov/acdsee-photo-sorter
+        
+        Version {__version__} 
+        ''')
+    elif input_ext == '':
+        input_ext = DEFAULT_EXTENSION
+    else:
+        input_ext = input_ext.lower()
+        if not input_ext.startswith(FOLDER_PATH):
+            input_ext = '.' +  input_ext
+    print('Indexing files...', end=' ')
+
+    file_paths, file_names, sorted_names = get_filepaths(FOLDER_PATH, input_ext, COPY_PATH)
+    print('Done')
     
-    File name extensions should be on!
-    (Windows Explorer -> View -> File name extension)
-    
-    Author/releases:
-    https://github.com/dsidov/acdsee-photo-sorter
-    
-    Version {__version__} 
-    ''')
-
-input_ext = input('Enter file extension (default is .NEF) ')
-
-if input_ext == '': 
-    input_ext = DEFAULT_EXTENSION
-else:
-    input_ext = input_ext.lower()
-    if not input_ext.startswith(FOLDER_PATH):
-        input_ext = '.' +  input_ext
-print('Getting file list...', end=' ')
-
-
-file_paths, file_names, sorted_names = get_filepaths(FOLDER_PATH, input_ext, COPY_PATH)
-print('Done.')
+    if len(file_paths) == 0: 
+        print(f'-------\n0 files found. Check file extension & .exe folder.', end=' ')
+    else:
+        print(f'-------\n{len(file_paths)} {input_ext} files found.', end=' ')
+        break
 
 
 if len(sorted_names) > 0:
     sorted_last = sorted(list(sorted_names))[-1]
-    print(f'{len(sorted_names)} already sorted. Last sorted file is {sorted_last}.')
+    print(f'{len(sorted_names)} file(s) already sorted. Last sorted file is {sorted_last}.')
 if len(file_paths) != len(file_names):
-    print('WARNING! Several files with same name exist! Only 1 file wil be copied!')
+    print('WARNING! Several files with same name exist! Only 1 file will be copied!')
 
 # print(file_paths, file_names)
-print('---\nPress Enter if you see matching foto. Enter anything to exit.')
+print('---\nPress Enter if you see matching photo.')
 
 
 while True:
