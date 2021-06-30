@@ -10,12 +10,11 @@ File name extension option should be on!
 import os
 import pathlib
 import shutil
-import time
 import win32gui
 
 
 __author__ = 'Dmitriy Sidov'
-__version__ = '0.1.2'
+__version__ = '0.1.3'
 __maintainer__ = 'Dmitriy Sidov'
 __email__ = 'dmitriy.sidov@gmail.com'
 __status__ = 'Minimal fuctionality'
@@ -99,14 +98,11 @@ def copy_file(file_path, copy_path):
 if __name__ == "__main__":
     print('ACDSee images sorter')
 
-    while True:
-        titles = get_title(DEFAULT_TITLE, None)
-        if len(titles) > 1:
-            input('WARNING! Several ACDSee copies are running! Please leave only 1')
-        elif len(titles) == 0:
-            input('WARNING! ACDSee is not running! Start the wiever')
-        else:
-            break
+    titles = get_title(DEFAULT_TITLE, None)
+    if len(titles) > 1:
+        print('WARNING! Several ACDSee copies are running! Please leave only one.')
+    elif len(titles) == 0:
+        print('WARNING! ACDSee is not running! Start the wiever')
 
     while True:
         input_ext = input('Enter file extension (def is .NEF). Type -h to get help. ')
@@ -136,7 +132,7 @@ if __name__ == "__main__":
         print('Done')
         
         if len(file_paths) == 0: 
-            print(f'-------\n0 files found. Check file extension & .exe folder.', end=' ')
+            print(f'-------\nERROR! 0 files found. Check file extension & .exe folder.')
         else:
             print(f'-------\n{len(file_paths)} {input_ext} files found.', end=' ')
             break
@@ -156,11 +152,11 @@ if __name__ == "__main__":
         else:
             titles = get_title(DEFAULT_TITLE, input_ext)
             if len(titles) > 1:
-                print('WARNING! Several ACDSee copies are running. Please close unused.')
+                print('ERROR! Several ACDSee copies are running. Please close unused.')
             elif len(titles) == 0:
-                print('WARNING! Start ACDSee and choose the file.')
+                print('ERROR! Start ACDSee and choose the file.')
             elif titles[0] not in file_names:
-                print('WARNING! File not Found. Put program in root folder and restart the program.')
+                print('ERROR! File not found! Choose file in viewer.')
             else:
                 i = 0
                 for path in file_paths:
@@ -168,16 +164,13 @@ if __name__ == "__main__":
                     if path.lower().endswith(titles[0].lower()):
                         sorted_new = os.path.basename(path)
                         if sorted_new in sorted_names:
-                            print(f'{sorted_new} is already exist!')
+                            print(f'ERROR! {sorted_new} already exists!')
                         else:
                             print(f'{titles[0]}. Copying...', end=' ')
-                            time_st = time.time()
                             was_copied = copy_file(path, COPY_PATH)
                             if was_copied is True:
-                                time_end = time.time()
                                 sorted_names.add(sorted_new)
-                                print(f'Sorted: {len(sorted_names)}. Progress: {round(100*i/len(file_paths))}%. Done.')
-                                # Time: {round(time_end - time_st,3)}.
+                                print(f'Done. Progress {round(100*i/len(file_paths))}%')                                
                                 break
                             else:
                                 print('Error!')
