@@ -12,7 +12,7 @@ PAUSE
 ECHO.
 ECHO Compiling... 
 ECHO -------------------------------------
-pyinstaller --onefile --name=_adcsee-sorter_0.2.exe acdsee_sorter.py
+pyinstaller --onefile --name=_adcsee-sorter_0.1.0.exe acdsee_sorter.py
 ECHO.
 ECHO If no errors were encountered while building, the executable file is located in the /dist folder
 PAUSE
