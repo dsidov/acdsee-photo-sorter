@@ -11,10 +11,11 @@ import os
 import pathlib
 import shutil
 import win32gui
-
+import win32api
+import ctypes
 
 __author__ = 'Dmitriy Sidov'
-__version__ = '0.1.3'
+__version__ = '0.2.0'
 __maintainer__ = 'Dmitriy Sidov'
 __email__ = 'dmitriy.sidov@gmail.com'
 __status__ = 'Minimal fuctionality'
@@ -24,6 +25,27 @@ FOLDER_PATH = '.'
 COPY_PATH = './_sorted'
 DEFAULT_EXTENSION = '.NEF'
 DEFAULT_TITLE = 'ACDSee'
+
+
+def alter_shell():
+    
+    def get_display_resolution():
+        width = win32api.GetSystemMetrics(0)
+        height =  win32api.GetSystemMetrics(1)
+        return width, height
+    
+    def enumHandler(hwnd, extra):
+        if win32gui.IsWindowVisible(hwnd):
+            win32gui.MoveWindow(hwnd, pos_x, pos_y, shell_w, shell_h, True)
+
+    disp_w, disp_h = get_display_resolution()
+    shell_w = round((disp_h - disp_h / 3 * 4) / 2) # 4x3 photo aspect ratio
+    if shell_w < 120: shell_w = 240
+    shell_h = round(disp_h / 2)
+    pos_x = disp_w - shell_w
+    pos_y = round(disp_h / 4)
+    
+    win32gui.EnumWindows(enumHandler, None)
 
 
 def get_filepaths(folder_path, file_extension, copy_path):
@@ -137,6 +159,9 @@ if __name__ == "__main__":
             print(f'-------\n{len(file_paths)} {input_ext} files found.', end=' ')
             break
 
+    os.system('cls')
+    alter_shell()
+
     if len(sorted_names) > 0:
         sorted_last = sorted(list(sorted_names))[-1]
         print(f'{len(sorted_names)} file(s) already sorted. Last sorted file is {sorted_last}.')
@@ -170,6 +195,7 @@ if __name__ == "__main__":
                             was_copied = copy_file(path, COPY_PATH)
                             if was_copied is True:
                                 sorted_names.add(sorted_new)
+                                ctypes.windll.user32.FlashWindow(ctypes.windll.kernel32.GetConsoleWindow(), True)
                                 print(f'Done. Progress {round(100*i/len(file_paths))}%')                                
                                 break
                             else:
