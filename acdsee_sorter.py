@@ -15,7 +15,7 @@ import ctypes
 import winsound
 
 __author__ = 'Dmitriy Sidov'
-__version__ = '0.2.0'
+__version__ = '0.2.1'
 __maintainer__ = 'Dmitriy Sidov'
 __email__ = 'dmitriy.sidov@gmail.com'
 __status__ = 'Minimal fuctionality'
@@ -96,14 +96,17 @@ def copy_file(file_path, copy_path):
         return False
 
 
-def notify_user(is_error=False):
+def notify_user(program_name, is_error=False, box_title='Title', box_message='Message'):
     if is_error:
         winsound.PlaySound("SystemExclamation", winsound.SND_ALIAS)
+        # if win32gui.GetWindowText(win32gui.GetForegroundWindow()) != program_name:
+            # ctypes.windll.user32.MessageBoxW(0, box_message, box_title, 0)
     else:
         ctypes.windll.user32.FlashWindow(ctypes.windll.kernel32.GetConsoleWindow(), True)
         
         
 if __name__ == "__main__":
+    os.system('mode 100,35')
     program_name = f'ACDSee sorter v{__version__}'
     ctypes.windll.kernel32.SetConsoleTitleW(program_name)
     
@@ -154,9 +157,14 @@ if __name__ == "__main__":
         print(f'{len(sorted_names)} file(s) already sorted. Last sorted file is {sorted_last}.')
     if len(file_paths) != len(file_names):
         print('WARNING! Several files with same name exist! Only 1 file will be copied!')
-    
+
     print('---\nPress Enter if you see matching photo.')
+    input('Press Enter to start')
     
+    os.system('cls')
+    os.system('mode 24,35')
+    print('Ready')
+
     while True:
         not_enter = input()
         if not_enter != '':
@@ -164,13 +172,13 @@ if __name__ == "__main__":
         else:
             titles = get_title(DEFAULT_TITLE, input_ext)
             if len(titles) > 1:
-                notify_user(is_error=True)
+                notify_user(program_name, is_error=True)
                 print('ERROR! Several ACDSee copies are running. Please close unused.')
             elif len(titles) == 0:
-                notify_user(is_error=True)
+                notify_user(program_name, is_error=True)
                 print('ERROR! Start ACDSee and choose the file.')
             elif titles[0] not in file_names:
-                notify_user(is_error=True)
+                notify_user(program_name, is_error=True)
                 print('ERROR! File not found! Choose file in viewer.')
             else:
                 i = 0
@@ -179,14 +187,14 @@ if __name__ == "__main__":
                     if path.lower().endswith(titles[0].lower()):
                         sorted_new = os.path.basename(path)
                         if sorted_new in sorted_names:
-                            print(f'ERROR! {sorted_new} already exists!')
+                            print(f'ERROR! {sorted_new}\nalready exists!')
                         else:
-                            print(f'{titles[0]}. Copying...', end=' ')
+                            print(f'{titles[0]}...', end=' ')
                             was_copied = copy_file(path, COPY_PATH)
                             if was_copied is True:
                                 sorted_names.add(sorted_new)
-                                notify_user()
-                                print(f'Done. Progress {round(100*i/len(file_paths))}%')                                
+                                notify_user(program_name)
+                                print(f'Done. P{round(100*i/len(file_paths))}%')                                
                                 break
                             else:
                                 print('Error!')
