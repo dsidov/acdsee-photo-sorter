@@ -13,10 +13,10 @@ import shutil
 import win32gui
 import ctypes
 import winsound
-import keyboard 
+import keyboard
 
 __author__ = 'Dmitriy Sidov'
-__version__ = '0.3.0'
+__version__ = '0.3.1'
 __maintainer__ = 'Dmitriy Sidov'
 __email__ = 'dmitriy.sidov@gmail.com'
 __status__ = 'Keypress version only'
@@ -26,7 +26,7 @@ FOLDER_PATH = '.'
 COPY_PATH = './_sorted'
 DEFAULT_EXTENSION = '.NEF'
 DEFAULT_TITLE = 'ACDSee'
-DEFAULT_KEY = 'c' # def key/shortcut for file copying
+DEFAULT_KEY = 'x' # def key/shortcut for file copying
 
 def get_filepaths(folder_path, file_extension, copy_path):
 
@@ -53,7 +53,7 @@ def get_filepaths(folder_path, file_extension, copy_path):
     return file_paths, file_names, sorted_names
 
 
-def get_title(search_title : str, file_extension):
+def get_titles(search_title : str, file_extension):
 
     search_title = search_title.lower()
 
@@ -76,7 +76,17 @@ def get_title(search_title : str, file_extension):
         return titles
     else:
         return raw_titles
-    
+
+
+def get_active_title(search_title, file_extension):
+    search_title = search_title.lower()
+    raw_title = win32gui.GetWindowText(win32gui.GetForegroundWindow())
+    if file_extension.lower() in raw_title.lower():
+        title_formatted = raw_title[:raw_title.find(file_extension)] + file_extension
+        if len(title_formatted) > len(file_extension):
+            return title_formatted
+    return ''
+
 
 def copy_file(file_path, copy_path):
     
@@ -97,23 +107,20 @@ def copy_file(file_path, copy_path):
         return False
 
 
-def notify_user(program_name, is_error=False, box_title='Title', box_message='Message'):
+def notify_user(is_error=False, box_title='Title', box_message='Message'):
     if is_error:
         winsound.PlaySound("SystemExclamation", winsound.SND_ALIAS)
-        if win32gui.GetWindowText(win32gui.GetForegroundWindow()) != program_name:
-            ctypes.windll.user32.MessageBoxW(0, box_message, box_title, 0)
+        ctypes.windll.user32.MessageBoxW(0, box_message, box_title, 0)
     else:
         ctypes.windll.user32.FlashWindow(ctypes.windll.kernel32.GetConsoleWindow(), True)
         
         
 if __name__ == "__main__":
-
-    program_name = f'ACDSee sorter v{__version__}'
-    ctypes.windll.kernel32.SetConsoleTitleW(program_name)
+    ctypes.windll.kernel32.SetConsoleTitleW(f'ACDSee sorter v{__version__}')
     
     print('ACDSee images sorter')
     
-    titles = get_title(DEFAULT_TITLE, None)
+    titles = get_titles(DEFAULT_TITLE, None)
     if len(titles) > 1:
         print('WARNING! Several ACDSee copies are running! Please leave only one.')
     elif len(titles) == 0:
@@ -145,7 +152,7 @@ if __name__ == "__main__":
         print('Indexing files...', end=' ')
 
         file_paths, file_names, sorted_names = get_filepaths(FOLDER_PATH, input_ext, COPY_PATH)
-        print('Done')
+        print('Done.')
         
         if len(file_paths) == 0: 
             print(f'-------\nERROR! 0 files found. Check file extension & .exe folder.')
@@ -164,31 +171,41 @@ if __name__ == "__main__":
     while True:
         try:
             keyboard.wait(DEFAULT_KEY)
-            titles = get_title(DEFAULT_TITLE, input_ext)
-            if len(titles) > 1:
-                notify_user(program_name, is_error=True)
-                print('ERROR! Several ACDSee copies are running. Please close unused.')
-            elif len(titles) == 0:
-                notify_user(program_name, is_error=True)
-                print('ERROR! Start ACDSee and choose the file.')
-            elif titles[0] not in file_names:
-                notify_user(program_name, is_error=True)
-                print('ERROR! File not found! Choose file in viewer.')
+            
+            has_error = True
+            title = get_active_title(DEFAULT_TITLE, input_ext)
+            if len(title) == 0:
+                titles = get_titles(DEFAULT_TITLE, input_ext)
+                if len(titles) > 1:
+                    notify_user(is_error=True, box_title='ERROR!', box_message='Several ACDSee copies are running. Please close unused.')
+                    print('ERROR! Several ACDSee copies are running. Please close unused.')
+                elif len(titles) == 0:
+                    notify_user(is_error=True, box_title='ERROR!', box_message='Start ACDSee and choose the file.')
+                    print('ERROR! Start ACDSee and choose the file.')
+                elif titles[0] not in file_names:
+                    notify_user(is_error=True, jbox_title='ERROR!', box_message='ERROR! File not found! Choose file in viewer.')
+                    print('ERROR! File not found! Choose file in viewer.')
+                else:
+                    title = titles[0]
+                    has_error = False
             else:
+                has_error = False    
+                
+            if not has_error:
                 i = 0
                 for path in file_paths:
                     i += 1
-                    if path.lower().endswith(titles[0].lower()):
+                    if path.lower().endswith(title.lower()):
                         sorted_new = os.path.basename(path)
                         if sorted_new in sorted_names:
                             print(f'ERROR! {sorted_new} already exists!')
-                            notify_user(program_name, is_error=True, box_title='ERROR!', box_message='File already exist!')
+                            notify_user(is_error=True, box_title='ERROR!', box_message='File already exist!')
                         else:
-                            print(f'{titles[0]} is copying...', end=' ')
+                            print(f'{title} is copying...', end=' ')
                             was_copied = copy_file(path, COPY_PATH)
                             if was_copied is True:
                                 sorted_names.add(sorted_new)
-                                notify_user(program_name)
+                                notify_user()
                                 print(f'Done. Progress {round(100*i/len(file_paths))}%')                                
                                 break
                             else:
