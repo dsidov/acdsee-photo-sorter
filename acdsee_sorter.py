@@ -1,15 +1,15 @@
 #!/usr/bin/env python
 '''
 ACDSee photo sorter.
-
 Script is searching for opened in ADCSee image file and copying it by pressing Enter. 
-File name extension option should be on!
 '''
-
-
+import argparse
+import shlex
+import textwrap
 import os
 import pathlib
 import shutil
+# from threading import settrace
 import win32gui
 import ctypes
 import keyboard
@@ -17,22 +17,78 @@ import notifications
 
 
 __author__ = 'Dmitriy Sidov'
-__version__ = '0.3.2'
+__version__ = '0.4.0'
 __maintainer__ = 'Dmitriy Sidov'
 __email__ = 'dmitriy.sidov@gmail.com'
-__status__ = 'Keypress version only'
+__status__ = 'With argparse'
 
 
-FOLDER_PATH = '.'
-COPY_PATH = './_sorted'
-DEFAULT_EXTENSION = '.NEF'
-DEFAULT_TITLE = 'ACDSee'
-DEFAULT_KEY = 'x' # def key/shortcut for file copying
+# System defaults init here
+def _parse_args(arguments=None):
+    parser = argparse.ArgumentParser(
+        description=textwrap.dedent('''
+        HOW TO USE
+        ----------
+        Put .exe file into photos root folder and run program.
+        Enter search file extension.
+        (It will search for all files with specified extension inside this folder except /_sorted/ folder)
+        Start ACDSee, switch files and press 'x' when you see matching photo.
+        You will see success message if file was copied and error message if something gone wrong.
 
+        !Warning! You will not be able to copy the new photo until the message disappears!
+
+        Files copy into /_sorted/ folder. Files in this folder are not indexing for copy.
+
+        COMMANDS
+        --------
+        # usage (by console): program.exe [option] 
+        usage (by .exe): type [option]
+        '''), 
+        formatter_class=argparse.RawTextHelpFormatter,                                        
+        epilog=textwrap.dedent(f'''
+        examples:
+            -e jpg
+            -a -i D:\\Users\\User\\Pictures -k c
+
+        MISC
+        ----
+        For correct functioning, filename extensions must be enabled.
+        To do it: go Windows Explorer -> View -> File name extension.
+
+
+        AUTHOR/RELEASES
+        ---------------
+        Dmitriy Sidov
+        https://github.com/dsidov/acdsee-sorter
+        v{__version__} - 2021'''),
+        add_help=False)
+
+    # parser.add_argument('-a','--any', action='store_true', help='search file in any active window, not only ACDSee')
+    parser.add_argument('-e','--extension', default='.NEF', type=str, help='file extension')
+    # parser.add_argument('-g','--gui', action='store_false', help='don\'t show GUI interface')       
+    parser.add_argument('-h','--help', action='store_true', help='show this help message')
+    parser.add_argument('-i','--input', default='.', type=str, action='store', help='input directory path')
+    parser.add_argument('-k','--key', default='x', type=str, action='store', help='change default key')
+    parser.add_argument('-o','--output', default='./_sorted', type=str, action='store', help='output directory path')
+    # parser.add_argument('-s', '--superficial', action='store_true', help='search filename only in active window')
+    parser.add_argument('-t', '--title', default='ACDSee', type=str, action='store', help='search for specified title in active window')
+    
+    if (arguments is None) or (arguments == ''):
+        args = parser.parse_args()
+    else:
+        args = parser.parse_args(shlex.split(arguments))
+    
+    # rm when add GUI    
+    if args.help:
+        parser.print_help()
+    return args
+
+# add output folder files checking - done!
+# if file_path.startswith(abs output path) - done!
 def get_filepaths(folder_path, file_extension, copy_path):
-
-    folder_path_abs = os.path.abspath(folder_path)
+    folder_path_abs = os.path.abspath(folder_path).replace('\\','/') + '/'
     copy_path_abs = os.path.abspath(copy_path).replace('\\','/') + '/'
+    
     if not os.path.exists(folder_path_abs):
         print(f'ERROR: {__name__}.get_filepaths. Рath {folder_path} doesn\'t exist.')
         return None, None, None
@@ -108,57 +164,40 @@ def copy_file(file_path, copy_path):
         return False
 
 
-# def notify_user(is_error=False, box_title='Title', box_message='Message'):
-#     if is_error:
-#         winsound.PlaySound("SystemExclamation", winsound.SND_ALIAS)
-#         ctypes.windll.user32.MessageBoxW(0, box_message, box_title, 0)
-#     else:
-#         ctypes.windll.user32.FlashWindow(ctypes.windll.kernel32.GetConsoleWindow(), True)
-        
-        
 if __name__ == "__main__":
     ctypes.windll.kernel32.SetConsoleTitleW(f'ACDSee sorter v{__version__}')
     
-    print('ACDSee images sorter')
-    
-    titles = get_titles(DEFAULT_TITLE, None)
-    if len(titles) > 1:
-        print('WARNING! Several ACDSee copies are running! Please leave only one.')
-    elif len(titles) == 0:
-        print('WARNING! ACDSee is not running! Start the wiever')
-
+    print('--- ACDSee images sorter ---')
+     
+    # if no files found repeat
     while True:
-        input_ext = input('Enter file extension (def is .NEF). Type -h to get help. ')
-        if '-h' in input_ext:
-            print(f'''
-            Usage:
-            Put .exe file into photos root folder and run program.
-            Start ACDSee, use wheel to change photos and press enter when you see matching photo.
+        input_data = input('\nEnter command (-h to get help) or press Enter to continue.\n> ')
+        settings = _parse_args(input_data)
+        print(settings)
+        if settings.help:
             
-            File name extensions should be on!
-            (Windows Explorer -> View -> File name extension)
-            
-            Author/releases:
-            https://github.com/dsidov/acdsee-sorter
-            
-            Version {__version__} 
-            ''')
             continue
-        elif input_ext == '':
-            input_ext = DEFAULT_EXTENSION
-        else:
-            input_ext = input_ext.lower()
-            if not input_ext.startswith(FOLDER_PATH):
-                input_ext = '.' +  input_ext
+        
+        settings.extension = settings.extension.lower()
+        if not settings.extension.startswith('.'):
+            settings.extension = '.' + settings.extension
+    
         print('Indexing files...', end=' ')
 
-        file_paths, file_names, sorted_names = get_filepaths(FOLDER_PATH, input_ext, COPY_PATH)
+        file_paths, file_names, sorted_names = get_filepaths(settings.input, settings.extension, settings.output)
         print('Done.')
         
         if len(file_paths) == 0: 
             print(f'-------\nERROR! 0 files found. Check file extension & .exe folder.')
         else:
-            print(f'-------\n{len(file_paths)} {input_ext} files found.', end=' ')
+            print(f'-------\n{len(file_paths)} {settings.extension} files found.', end=' ')
+            
+            # checking is only 1 acdsee process running    
+            titles = get_titles(settings.title, None)
+            if len(titles) > 1:
+                print('WARNING! Several ACDSee copies are running! Please leave only one.')
+            elif len(titles) == 0:
+                print('WARNING! ACDSee is not running! Start the wiever')
             break
 
     if len(sorted_names) > 0:
@@ -167,18 +206,18 @@ if __name__ == "__main__":
     if len(file_paths) != len(file_names):
         print('WARNING! Several files with same name exist! Only 1 file will be copied!')
 
-    print(f'---\nPress {DEFAULT_KEY} if you see matching photo. Press CTRL+C to exit.')
+    print(f'---\nPress {settings.key} if you see matching photo. Press CTRL+C to exit.')
     
     notification = notifications.Notifications()
     
     while True:
         try:
-            keyboard.wait(DEFAULT_KEY)
+            keyboard.wait(settings.key)
             
             has_error = True
-            title = get_active_title(DEFAULT_TITLE, input_ext)
+            title = get_active_title(settings.title, settings.extension)
             if len(title) == 0:
-                titles = get_titles(DEFAULT_TITLE, input_ext)
+                titles = get_titles(settings.title, settings.extension)
                 if len(titles) > 1:
                     notification.msg_error(text='ERROR! Several ACDSee copies are running.') # Please close unused.')
                     print('ERROR! Several ACDSee copies are running. Please close unused.')
@@ -205,7 +244,7 @@ if __name__ == "__main__":
                             notification.msg_error(text='ERROR! File already exist!')
                         else:
                             print(f'{title} is copying...', end=' ')
-                            was_copied = copy_file(path, COPY_PATH)
+                            was_copied = copy_file(path, settings.output)
                             if was_copied is True:
                                 sorted_names.add(sorted_new)
                                 notification.msg_success(text=f'{sorted_new} saved. Sorted {len(sorted_names)}')
