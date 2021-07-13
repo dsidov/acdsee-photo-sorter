@@ -4,12 +4,13 @@
 import tkinter
 import ctypes
 import winsound
+import multiprocessing
 
 
 class Notifications():
     BORDER_COEFF = 2.6
     def __init__(self, font_size=18, offset=[25,25], max_lenght=40, has_taskbar=True, colors=['fff','ee3e34'], 
-                font_colors=['000', 'fff'], border_size=2, border_colors=['000','fff'], alpha=.9, display_time=[1,3]):
+                font_colors=['000', 'fff'], border_size=2, border_colors=['000','fff'], alpha=.9, display_time=[2,4]):
         '''
         Creates Notification object for further displaying.
         
@@ -87,9 +88,15 @@ class Notifications():
         self.notification.after(self.display_time[type]*1000, lambda: self.notification.destroy())        
 
             
+    def _msg_terminate(self):
+        if hasattr(self,'process') and self.process.is_alive():
+            self.process.terminate()        
+
+
     def msg_success(self, text: str):
         '''
-        Creates a message that files have been copied.
+        Creates a message that file has been copied. Block copying till message exist.
+        Dissapears over time. Can be closed by mouse click.
         '''
         self._msg_init(0, text)
         
@@ -100,9 +107,21 @@ class Notifications():
         self.notification.mainloop()
         
         
+    def msg_success_proc(self, text: str):
+        '''
+        Creates a message that file has been added (copied).
+        Process that terminate itself when a new message come.
+        Dissapears over time. Can be closed by mouse click.
+        '''
+        self._msg_terminate()        
+        self.process = multiprocessing.Process(target=self.msg_success, args=(text,))
+        self.process.start()
+        
+        
     def msg_error(self, text: str, extended_errors=False):
         '''
-        Creates a message that error were encountered.
+        Creates a message that error was encountered. Block copying till message exist.
+        Dissapears over time. Can be closed by mouse click.
         
         Parameters
         ----------
@@ -112,11 +131,28 @@ class Notifications():
         '''
         self._msg_init(1, text)
 
-        self.notification.bind('<x>', lambda _: self.notification.destroy())
+        # self.notification.bind('<x>', lambda _: self.notification.destroy())
         self.notification.bind('<Button-1>', lambda _: self.notification.destroy())        
+        
+        self.notification.mainloop()
         
         if extended_errors:
             winsound.PlaySound("SystemExclamation", winsound.SND_ALIAS)
             ctypes.windll.user32.FlashWindow(ctypes.windll.kernel32.GetConsoleWindow(), True)
-            
-        self.notification.mainloop()
+
+
+    def msg_error_proc(self, text: str, extended_error=False):
+        '''
+        Creates a message that error was encountered.
+        Process that terminate itself when a new message come.
+        Dissapears over time. Can be closed by mouse click.
+        
+        Parameters
+        ----------
+        text : str
+        extended_errors : boolean
+            Adds Windows error sound & flash program icon.        
+        '''
+        self._msg_terminate()
+        self.process = multiprocessing.Process(target=self.msg_error, args=(text,extended_error,))
+        self.process.start()

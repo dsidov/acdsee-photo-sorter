@@ -17,7 +17,7 @@ import notifications
 
 
 __author__ = 'Dmitriy Sidov'
-__version__ = '0.4.0'
+__version__ = '0.4.1'
 __maintainer__ = 'Dmitriy Sidov'
 __email__ = 'dmitriy.sidov@gmail.com'
 __status__ = 'With argparse'
@@ -219,13 +219,13 @@ if __name__ == "__main__":
             if len(title) == 0:
                 titles = get_titles(settings.title, settings.extension)
                 if len(titles) > 1:
-                    notification.msg_error(text='ERROR! Several ACDSee copies are running.') # Please close unused.')
+                    notification.msg_error_proc(text='ERROR! Several ACDSee copies are running.') # Please close unused.')
                     print('ERROR! Several ACDSee copies are running. Please close unused.')
                 elif len(titles) == 0:
-                    notification.msg_error(text='ERROR! Start ACDSee and choose the file.')
+                    notification.msg_error_proc(text='ERROR! Start ACDSee and choose the file.')
                     print('ERROR! Start ACDSee and choose the file.')
                 elif titles[0] not in file_names:
-                    notification.msg_error(text='ERROR! File not found! Choose file in viewer.')
+                    notification.msg_error_proc(text='ERROR! File not found! Choose file in viewer.')
                     print('ERROR! File not found! Choose file in viewer.')
                 else:
                     title = titles[0]
@@ -241,17 +241,17 @@ if __name__ == "__main__":
                         sorted_new = os.path.basename(path)
                         if sorted_new in sorted_names:
                             print(f'ERROR! {sorted_new} already exists!')
-                            notification.msg_error(text='ERROR! File already exist!')
+                            notification.msg_error_proc(text='ERROR! File already exist!')
                         else:
                             print(f'{title} is copying...', end=' ')
                             was_copied = copy_file(path, settings.output)
                             if was_copied is True:
                                 sorted_names.add(sorted_new)
-                                notification.msg_success(text=f'{sorted_new} saved. Sorted {len(sorted_names)}')
+                                notification.msg_success_proc(text=f'{sorted_new} saved. Sorted {len(sorted_names)}')
                                 print(f'Done. Sorted: {len(sorted_names)}. Progress: {round(100*i/len(file_paths))}%')                                
                                 break
                             else:
-                                notification.msg_error(text='ERROR!')
+                                notification.msg_error_proc(text='ERROR!')
                                 print('Error!')
         except KeyboardInterrupt:
             print('\nProgram is stopping...')
