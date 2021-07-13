@@ -4,6 +4,7 @@ ACDSee photo sorter.
 Script is searching for opened in ADCSee image file and copying it by pressing Enter. 
 '''
 import argparse
+import multiprocessing
 import shlex
 import textwrap
 import os
@@ -14,6 +15,9 @@ import win32gui
 import ctypes
 import keyboard
 import notifications
+
+# https://stackoverflow.com/questions/24944558/pyinstaller-built-windows-exe-fails-with-multiprocessing
+multiprocessing.freeze_support() 
 
 
 __author__ = 'Dmitriy Sidov'
