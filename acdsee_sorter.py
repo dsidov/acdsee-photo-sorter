@@ -21,11 +21,13 @@ multiprocessing.freeze_support()
 
 
 __author__ = 'Dmitriy Sidov'
-__version__ = '0.4.1'
+__version__ = '0.4.2'
 __maintainer__ = 'Dmitriy Sidov'
 __email__ = 'dmitriy.sidov@gmail.com'
 __status__ = 'With argparse'
 
+
+ACDSEE_TITLE = ' - ACDSee '
 
 # System defaults init here
 def _parse_args(arguments=None):
@@ -131,7 +133,7 @@ def get_titles(search_title : str, file_extension):
         titles = list()
         for title in raw_titles:
             if file_extension.lower() in title.lower(): # when windows explorer shows file extensions
-                title_formatted = title[:title.find(file_extension)] + file_extension
+                title_formatted = title[:title.find(ACDSEE_TITLE)]
                 if len(title_formatted) > len(file_extension):
                     titles.append(title_formatted)
         return titles
@@ -143,7 +145,7 @@ def get_active_title(search_title, file_extension):
     search_title = search_title.lower()
     raw_title = win32gui.GetWindowText(win32gui.GetForegroundWindow())
     if file_extension.lower() in raw_title.lower():
-        title_formatted = raw_title[:raw_title.find(file_extension)] + file_extension
+        title_formatted = raw_title[:raw_title.find(ACDSEE_TITLE)]
         if len(title_formatted) > len(file_extension):
             return title_formatted
     return ''
