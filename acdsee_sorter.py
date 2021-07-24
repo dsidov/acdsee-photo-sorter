@@ -14,6 +14,7 @@ import shutil
 import win32gui
 import ctypes
 import keyboard
+# ↓ custom
 import notifications
 
 # https://stackoverflow.com/questions/24944558/pyinstaller-built-windows-exe-fails-with-multiprocessing
@@ -21,13 +22,11 @@ multiprocessing.freeze_support()
 
 
 __author__ = 'Dmitriy Sidov'
-__version__ = '0.4.2'
+__version__ = '0.4.3'
 __maintainer__ = 'Dmitriy Sidov'
 __email__ = 'dmitriy.sidov@gmail.com'
-__status__ = 'With argparse'
+__status__ = 'Refactored to classes'
 
-
-ACDSEE_TITLE = ' - ACDSee '
 
 # System defaults init here
 def _parse_args(arguments=None):
@@ -70,6 +69,7 @@ def _parse_args(arguments=None):
         add_help=False)
 
     # parser.add_argument('-a','--any', action='store_true', help='search file in any active window, not only ACDSee')
+    parser.add_argument('-b','--brute', action='store_true', help='Search files from input folder in ANY software (may work slow)')
     parser.add_argument('-e','--extension', default='.NEF', type=str, help='file extension')
     # parser.add_argument('-g','--gui', action='store_false', help='don\'t show GUI interface')       
     parser.add_argument('-h','--help', action='store_true', help='show this help message')
@@ -77,188 +77,164 @@ def _parse_args(arguments=None):
     parser.add_argument('-k','--key', default='x', type=str, action='store', help='change default key')
     parser.add_argument('-o','--output', default='./_sorted', type=str, action='store', help='output directory path')
     # parser.add_argument('-s', '--superficial', action='store_true', help='search filename only in active window')
-    parser.add_argument('-t', '--title', default='ACDSee', type=str, action='store', help='search for specified title in active window')
+    parser.add_argument('-t', '--title', default=' - ACDSee', type=str, action='store', help='search for specified title in active window')
     
     if (arguments is None) or (arguments == ''):
         args = parser.parse_args()
     else:
-        args = parser.parse_args(shlex.split(arguments))
+        args = parser.parse_args(shlex.split(arguments)) # remove when gui?
     
-    # rm when add GUI    
+    # rm when add GUI (?)
     if args.help:
         parser.print_help()
     return args
 
-# add output folder files checking - done!
-# if file_path.startswith(abs output path) - done!
-def get_filepaths(folder_path, file_extension, copy_path):
-    folder_path_abs = os.path.abspath(folder_path).replace('\\','/') + '/'
-    copy_path_abs = os.path.abspath(copy_path).replace('\\','/') + '/'
-    
-    if not os.path.exists(folder_path_abs):
-        print(f'ERROR: {__name__}.get_filepaths. Рath {folder_path} doesn\'t exist.')
-        return None, None, None
-    else:
-        file_paths = list()
-        file_names = set()
-        sorted_names = set()
-        f_extension = file_extension.lower()
 
-        for folder, _, files in os.walk(folder_path_abs):
-            for f in files:
-                if f_extension in f.lower():
-                    folder_path = folder.replace('\\','/') + '/'
-                    if folder_path == copy_path_abs:
-                        sorted_names.add(f)
+class Sorter:
+    
+    def _get_files_and_paths(self, path_input, path_output, extension, verbose):
+        if verbose:
+            print('Indexing files...', end=' ')
+        path_input_abs = os.path.abspath(path_input).replace('\\','/') + '/'
+        path_output_abs = os.path.abspath(path_output).replace('\\','/') + '/'
+        
+        if not os.path.exists(path_input_abs):
+            print(f'ERROR: {__name__}.get_filepaths. Рath {path_input} doesn\'t exist.')
+            self.path_input = None
+        else:
+            self.path_input = path_input_abs
+            self.path_output = path_output_abs
+            
+            if not os.path.exists(path_output_abs):
+                os.makedirs(path_output)
+            
+            self.files = list()
+            self.filenames = set()
+            self.filenames_sorted = set()
+            self.extension = extension.lower()
+
+            for folder, _, files in os.walk(self.path_input):
+                for f in files:
+                    if f.lower().endswith(self.extension):
+                        folder_path = folder.replace('\\','/') + '/'
+                        if folder_path == self.path_output:
+                            self.filenames_sorted.add(f)
+                        else:
+                            self.files.append(folder_path + f)
+                            self.filenames.add(f)
+            
+            if verbose:
+                print('Done.')
+                
+            if len(self.files) == 0: 
+                print(f'-------\nERROR! 0 files found. Check file extension & .exe folder.')
+            elif verbose:
+                print(f'-------\n{len(self.files)} {self.extension} files found.', end=' ')
+
+            if verbose:
+                if len(self.filenames_sorted) > 0:
+                    sorted_last = sorted(list(self.filenames_sorted))[-1]
+                    print(f'{len(self.filenames_sorted)} file(s) already sorted. Last sorted file is {sorted_last}.')
+                if len(self.filenames) != len(self.files):
+                    print('WARNING! Several files with same name exist! Only 1 file will be copied!')
+
+
+    def __init__(self, path_input, path_output, extension, title, brute_search=False, verbose=True): # TODO add brute
+        if verbose:
+            ctypes.windll.kernel32.SetConsoleTitleW(f'ACDSee sorter v{__version__}')
+        self._get_files_and_paths(path_input, path_output, extension, verbose)
+        self.title = title
+        
+        # checking what title do we have to save time
+        titles = self._get_titles()
+        if len(titles) > 1:
+            print('WARNING! Several ACDSee copies are running!')
+        elif len(titles) == 0:
+            print('WARNING! ACDSee is not running! Start the wiever')
+
+
+    def _get_active_filename(self):
+        raw_title = win32gui.GetWindowText(win32gui.GetForegroundWindow())
+        if self.extension in raw_title.lower():
+            title_formatted = raw_title[:raw_title.find(self.title)]
+            if len(title_formatted) > len(self.extension):
+                return title_formatted
+        else: 
+            return None
+
+
+    def _get_titles(self):
+
+        def EnumHandler(hwnd, titles): 
+            if win32gui.IsWindowVisible(hwnd):
+                title = win32gui.GetWindowText(hwnd)
+                if self.title in title.lower():
+                    titles.append(title)
+        
+        raw_titles = list()    
+        win32gui.EnumWindows(EnumHandler, raw_titles)
+        
+        if self.extension is not None:
+            titles = list()
+            for title in raw_titles:
+                if self.extension in title.lower(): # when windows explorer shows file extensions
+                    title_formatted = title[:title.find(self.title)]
+                    if len(title_formatted) > len(self.extension):
+                        titles.append(title_formatted)
+            return titles
+        else:
+            return raw_titles
+
+
+    def copy_active_file(self, notification=notifications.Notifications()):
+        '''
+        Searches a file name in the active title, checks does it have path in self.files, tries to copy.
+        '''
+        active_filename = self._get_active_filename()
+        if active_filename is None:
+            notification.msg_error_proc(text='ERROR! File not found! Choose file in viewer.')
+        else:
+            i = 0
+            for file in self.files:
+                i += 1
+                if file.endswith(active_filename):
+                    sorted_new = os.path.basename(file)
+                    if active_filename in self.filenames_sorted:
+                        print(f'ERROR! {sorted_new} already exists!')
+                        notification.msg_error_proc(text='ERROR! File already exist!')
                     else:
-                        file_paths.append(folder_path + f)
-                        file_names.add(f)
-    return file_paths, file_names, sorted_names
-
-
-def get_titles(search_title : str, file_extension):
-
-    search_title = search_title.lower()
-
-    def EnumHandler(hwnd, titles): 
-        if win32gui.IsWindowVisible(hwnd):
-            title = win32gui.GetWindowText(hwnd)
-            if search_title in title.lower():
-                titles.append(title)
-    
-    raw_titles = list()    
-    win32gui.EnumWindows(EnumHandler, raw_titles)
-    
-    if file_extension is not None:
-        titles = list()
-        for title in raw_titles:
-            if file_extension.lower() in title.lower(): # when windows explorer shows file extensions
-                title_formatted = title[:title.find(ACDSEE_TITLE)]
-                if len(title_formatted) > len(file_extension):
-                    titles.append(title_formatted)
-        return titles
-    else:
-        return raw_titles
-
-
-def get_active_title(search_title, file_extension):
-    search_title = search_title.lower()
-    raw_title = win32gui.GetWindowText(win32gui.GetForegroundWindow())
-    if file_extension.lower() in raw_title.lower():
-        title_formatted = raw_title[:raw_title.find(ACDSEE_TITLE)]
-        if len(title_formatted) > len(file_extension):
-            return title_formatted
-    return ''
-
-
-def copy_file(file_path, copy_path):
-    
-    file_name = os.path.split(file_path)[-1]
-    new_dir = os.path.abspath(copy_path).replace('\\','/')
-    
-    if not new_dir.endswith('/'):
-        new_dir += '/' 
-    new_path = new_dir + file_name
-   
-    if not os.path.exists(new_dir):
-        os.makedirs(new_dir)
-    shutil.copyfile(file_path, new_path)
-    
-    if os.path.isfile(new_path) and (pathlib.Path(file_path).stat().st_size == pathlib.Path(new_path).stat().st_size):
-        return True
-    else:
-        return False
-
+                        print(f'{file} is copying...', end=' ')
+                        new_path = self.path_output + sorted_new
+                        shutil.copyfile(file, new_path)
+                        if os.path.isfile(new_path) and (pathlib.Path(file).stat().st_size == pathlib.Path(new_path).stat().st_size):
+                            self.filenames_sorted.add(sorted_new)
+                            notification.msg_success_proc(text=f'{sorted_new} saved. Sorted {len(self.filenames_sorted)}')
+                            print(f'Done. Sorted: {len(self.filenames_sorted)}. Progress: {round(100*i/len(self.files))}%')
+                        else:
+                            notification.msg_error_proc(text='''ERROR! Can't copy file''')
+                            print('''ERROR! Can't copy file''')
+                            
 
 if __name__ == "__main__":
-    ctypes.windll.kernel32.SetConsoleTitleW(f'ACDSee sorter v{__version__}')
-    
-    print('--- ACDSee images sorter ---')
-     
-    # if no files found repeat
+
     while True:
         input_data = input('\nEnter command (-h to get help) or press Enter to continue.\n> ')
         settings = _parse_args(input_data)
         print(settings)
         if settings.help:
-            
             continue
         
         settings.extension = settings.extension.lower()
         if not settings.extension.startswith('.'):
             settings.extension = '.' + settings.extension
-    
-        print('Indexing files...', end=' ')
+        break
 
-        file_paths, file_names, sorted_names = get_filepaths(settings.input, settings.extension, settings.output)
-        print('Done.')
-        
-        if len(file_paths) == 0: 
-            print(f'-------\nERROR! 0 files found. Check file extension & .exe folder.')
-        else:
-            print(f'-------\n{len(file_paths)} {settings.extension} files found.', end=' ')
-            
-            # checking is only 1 acdsee process running    
-            titles = get_titles(settings.title, None)
-            if len(titles) > 1:
-                print('WARNING! Several ACDSee copies are running! Please leave only one.')
-            elif len(titles) == 0:
-                print('WARNING! ACDSee is not running! Start the wiever')
-            break
-
-    if len(sorted_names) > 0:
-        sorted_last = sorted(list(sorted_names))[-1]
-        print(f'{len(sorted_names)} file(s) already sorted. Last sorted file is {sorted_last}.')
-    if len(file_paths) != len(file_names):
-        print('WARNING! Several files with same name exist! Only 1 file will be copied!')
-
-    print(f'---\nPress {settings.key} if you see matching photo. Press CTRL+C to exit.')
-    
-    notification = notifications.Notifications()
+    sorter = Sorter(settings.input, settings.output, settings.extension, settings.title)
     
     while True:
         try:
             keyboard.wait(settings.key)
-            
-            has_error = True
-            title = get_active_title(settings.title, settings.extension)
-            if len(title) == 0:
-                titles = get_titles(settings.title, settings.extension)
-                if len(titles) > 1:
-                    notification.msg_error_proc(text='ERROR! Several ACDSee copies are running.') # Please close unused.')
-                    print('ERROR! Several ACDSee copies are running. Please close unused.')
-                elif len(titles) == 0:
-                    notification.msg_error_proc(text='ERROR! Start ACDSee and choose the file.')
-                    print('ERROR! Start ACDSee and choose the file.')
-                elif titles[0] not in file_names:
-                    notification.msg_error_proc(text='ERROR! File not found! Choose file in viewer.')
-                    print('ERROR! File not found! Choose file in viewer.')
-                else:
-                    title = titles[0]
-                    has_error = False
-            else:
-                has_error = False    
-                
-            if not has_error:
-                i = 0
-                for path in file_paths:
-                    i += 1
-                    if path.lower().endswith(title.lower()):
-                        sorted_new = os.path.basename(path)
-                        if sorted_new in sorted_names:
-                            print(f'ERROR! {sorted_new} already exists!')
-                            notification.msg_error_proc(text='ERROR! File already exist!')
-                        else:
-                            print(f'{title} is copying...', end=' ')
-                            was_copied = copy_file(path, settings.output)
-                            if was_copied is True:
-                                sorted_names.add(sorted_new)
-                                notification.msg_success_proc(text=f'{sorted_new} saved. Sorted {len(sorted_names)}')
-                                print(f'Done. Sorted: {len(sorted_names)}. Progress: {round(100*i/len(file_paths))}%')                                
-                                break
-                            else:
-                                notification.msg_error_proc(text='ERROR!')
-                                print('Error!')
+            sorter.copy_active_file()
         except KeyboardInterrupt:
             print('\nProgram is stopping...')
             break
