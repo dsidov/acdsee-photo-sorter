@@ -16,13 +16,14 @@ import ctypes
 import keyboard
 # ↓ custom
 import notifications
+# import 
 
 # https://stackoverflow.com/questions/24944558/pyinstaller-built-windows-exe-fails-with-multiprocessing
 multiprocessing.freeze_support() 
 
 
 __author__ = 'Dmitriy Sidov'
-__version__ = '0.4.3'
+__version__ = '0.4.4'
 __maintainer__ = 'Dmitriy Sidov'
 __email__ = 'dmitriy.sidov@gmail.com'
 __status__ = 'Refactored to classes'
@@ -186,7 +187,7 @@ class Sorter:
             return raw_titles
 
 
-    def copy_active_file(self, notification=notifications.Notifications()):
+    def copy_active_file(self, notification=notifications.Notification()):
         '''
         Searches a file name in the active title, checks does it have path in self.files, tries to copy.
         '''
