@@ -9,7 +9,7 @@ import multiprocessing
 
 class Notification():
     BORDER_COEFF = 2.6
-    def __init__(self, font_size=18, offset=[25,25], max_lenght=60, has_taskbar=True, colors=['fff','ee3e34'], 
+    def __init__(self, font_size=18, offset=[25,25], max_lenght=60, has_taskbar=True, colors=['fafafa','c4352d'], 
                 font_colors=['000', 'fff'], border_size=2, border_colors=['000','fff'], alpha=.9, display_time=[2,4]):
         '''
         Creates Notification object for further displaying.
